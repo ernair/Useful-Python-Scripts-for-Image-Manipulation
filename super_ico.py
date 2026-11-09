@@ -1,43 +1,46 @@
 """
-Super ICO Converter (Color to Alpha + Windows ICO Generator)
-============================================================
-This script automates the entire process of creating high-quality, 
-multi-resolution Windows desktop icons (.ico) from any source image (JPG/PNG).
+Batch Super ICO Converter (Bulk Color to Alpha + Multi-Res ICO Generator via Click)
+==================================================================================
+This production-ready command-line tool automates background removal, transparent 
+PNG exporting, and Windows Icon (.ico) generation for ALL images within the current 
+working directory.
 
-It applies a smart mathematical 'Color to Alpha' algorithm (similar to GIMP/Photoshop) 
-to smoothly remove solid black or white backgrounds, preserving glowing neon edges 
-and soft semi-transparent anti-aliased shadows.
+It utilizes the 'click' library for clean argument parsing, automated validation, 
+and native terminal coloring. It scans the folder for JPG, JPEG, and PNG files, 
+implements a safety confirmation check, and smoothly processes images using 
+the 'Color to Alpha' pipeline.
 
 Prerequisites:
-    pip install Pillow
+    pip install Pillow click
 
 Usage:
-    python super_ico.py <mode> <path_to_image>
-    
-    Modes:
-        1 = Process Black Background (Smooth Black to Alpha)
-        2 = Process White Background (Smooth White to Alpha)
+    python batch_super_ico.py <mode> [options]
+
+Required Arguments:
+    <mode>    The background color to turn transparent:
+                1 = Bulk Process Black Backgrounds (Smooth Black to Alpha)
+                2 = Bulk Process White Backgrounds (Smooth White to Alpha)
+
+Optional Flags:
+    -f, --force  Force mode. Bypasses the confirmation prompt when a folder 
+                 contains a large batch of images (more than 5 files).
+    --png        PNG Export. Additionally saves the transparent results as 
+                 standalone PNG files ('<name>_transparent.png').
+    -h, --help   Show the built-in help menu and usage examples.
 
 Examples:
-    python super_ico.py 1 .\neon_lightning.png
-    python super_ico.py 2 .\company_logo.jpg
-
-Output:
-    Creates a true 'Multi-Resolution' .ico file in the same directory containing 
-    all standard Windows desktop layers (16x16 up to 256x256 pixels) for crisp scaling.
-    The original source file remains completely untouched.
+    python batch_super_ico.py 1
+    python batch_super_ico.py 1 --png
+    python batch_super_ico.py --help
 """
 
 
-
 import os
-import sys
+import click
 from PIL import Image
-
 
 def remove_color_background(img, mode):
     """Applies a 'Color to Alpha' algorithm, making black or white
-
     backgrounds smoothly transparent.
     """
     rgba_img = img.convert("RGBA")
@@ -45,11 +48,10 @@ def remove_color_background(img, mode):
     new_pixels = []
     
     if mode == 1:
-        print("-> Applying smooth BLACK to Alpha...")
+        click.echo("-> Applying smooth BLACK to Alpha...")
         for item in pixels:
             r, g, b, a = item
             max_channel = max(r, g, b)
-            
             if max_channel == 0:
                 new_pixels.append((0, 0, 0, 0))
             else:
@@ -60,11 +62,10 @@ def remove_color_background(img, mode):
                 new_pixels.append((new_r, new_g, new_b, alpha))
                 
     elif mode == 2:
-        print("-> Applying smooth WHITE to Alpha...")
+        click.echo("-> Applying smooth WHITE to Alpha...")
         for item in pixels:
             r, g, b, a = item
             min_channel = min(r, g, b)
-            
             if min_channel == 255:
                 new_pixels.append((0, 0, 0, 0))
             else:
@@ -77,53 +78,35 @@ def remove_color_background(img, mode):
     rgba_img.putdata(new_pixels)
     return rgba_img
 
+# --- CLICK CLI CONFIGURATION ---
 
-def create_ultimate_ico(image_path, mode):
-    """Processes the image and saves it directly as a multi-resolution Windows
-
-    .ico file.
+@click.command()
+@click.argument('mode', type=click.Choice(['1', '2']), callback=lambda c, p, v: int(v) if v else None)
+@click.argument('image_path', type=click.Path(exists=True, file_okay=True, dir_okay=False))
+def create_ultimate_ico(mode, image_path):
+    """Ultimate Single-File Icon Generator.
+    
+    Removes solid black (1) or white (2) backgrounds smoothly using a 
+    Color-to-Alpha pipeline and packs the image into a Windows .ico container.
     """
-    if not os.path.exists(image_path):
-        print(f"Error: The file '{image_path}' was not found.")
-        return
-
-    # Generate the final .ico file path
     file_name_without_ext, _ = os.path.splitext(image_path)
     ico_path = f"{file_name_without_ext}.ico"
 
     try:
-        # 1. Open the original image
+        click.echo(f"Processing '{image_path}'...")
         with Image.open(image_path) as img:
-            print(f"Processing '{image_path}'...")
-
-            # 2. Run the smart transparency background removal
+            # Run background removal
             transparent_img = remove_color_background(img, mode)
 
-            # 3. Define standard Windows desktop icon sizes
+            # Define standard Windows desktop icon sizes
             icon_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 
-            # 4. Save directly as ICO containing all layers
+            # Save directly as ICO
             transparent_img.save(ico_path, format="ICO", sizes=icon_sizes)
-            print(f"Success! Ultimate multi-resolution icon saved as: {ico_path}")
+            click.secho(f"Success! Icon saved as: {ico_path}", fg='green', bold=True)
 
     except Exception as e:
-        print(f"Something went wrong during execution: {e}")
-
+        click.secho(f"Something went wrong: {e}", fg='red', bold=True)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python super_ico.py <mode> <filename>")
-        print("Modes: 1 = Process Black Background, 2 = Process White Background")
-        print("Example: python super_ico.py 1 neon_lightning.png")
-    else:
-        try:
-            input_mode = int(sys.argv[1])
-            input_file = sys.argv[2]
-
-            if input_mode == 1 or input_mode == 2:
-                create_ultimate_ico(input_file, input_mode)
-            else:
-                print("Error: Mode must be either 1 (Black) or 2 (White).")
-                
-        except ValueError:
-            print("Error: The first argument (mode) must be an integer (1 or 2).")
+    create_ultimate_ico()
