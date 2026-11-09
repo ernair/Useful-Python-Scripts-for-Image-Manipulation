@@ -1,41 +1,42 @@
 """
-Batch Super ICO & PNG Converter (Bulk Color to Alpha Tool)
-==========================================================
+Batch Super ICO Converter (Bulk Color to Alpha + Multi-Res ICO Generator via Click)
+==================================================================================
 This production-ready command-line tool automates background removal, transparent 
 PNG exporting, and Windows Icon (.ico) generation for ALL images within the current 
 working directory.
 
-It scans the folder for JPG, JPEG, and PNG files, implements a safety volume-check 
-prompt to prevent accidental mass file creation, and applies a smooth GIMP-style 
-'Color to Alpha' algorithm to cleanly preserve neon glows, soft shadows, and anti-aliasing.
+It utilizes the 'click' library for clean argument parsing, automated validation, 
+and native terminal coloring. It scans the folder for JPG, JPEG, and PNG files, 
+implements a safety confirmation check, and smoothly processes images using 
+the 'Color to Alpha' pipeline.
 
 Prerequisites:
-    pip install Pillow
+    pip install Pillow click
 
 Usage:
     python batch_super_ico.py <mode> [options]
 
 Required Arguments:
     <mode>    The background color to turn transparent:
-                1 = Process Black Backgrounds (Smooth Black to Alpha)
-                2 = Process White Backgrounds (Smooth White to Alpha)
+                1 = Bulk Process Black Backgrounds (Smooth Black to Alpha)
+                2 = Bulk Process White Backgrounds (Smooth White to Alpha)
 
 Optional Flags:
-    -f        Force mode. Bypasses the confirmation prompt when a folder 
-              contains a large batch of images (more than 5 files).
-    --png     PNG Export. Additionally saves the transparent results as 
-              individual PNG files ('<name>_transparent.png').
-    -h, --help Show the built-in help menu and usage examples.
+    -f, --force  Force mode. Bypasses the confirmation prompt when a folder 
+                 contains a large batch of images (more than 5 files).
+    --png        PNG Export. Additionally saves the transparent results as 
+                 standalone PNG files ('<name>_transparent.png').
+    -h, --help   Show the built-in help menu and usage examples.
 
 Examples:
     python batch_super_ico.py 1
     python batch_super_ico.py 1 --png
-    python batch_super_ico.py 1 -f --png
     python batch_super_ico.py --help
 """
 
 import os
 import sys
+import click
 from PIL import Image
 
 def remove_color_background(img, mode):
@@ -75,35 +76,42 @@ def remove_color_background(img, mode):
     rgba_img.putdata(new_pixels)
     return rgba_img
 
-def process_batch(mode, force_flag, save_png_flag):
-    """Loops through all JPG and PNG images in the current folder,
-    removes backgrounds, and saves them as Windows .ico files and optionally transparent PNGs.
+# --- CLICK CLI CONFIGURATION ---
+
+@click.command()
+@click.argument('mode', type=click.Choice(['1', '2']), callback=lambda c, p, v: int(v) if v else None)
+@click.option('-f', '--force', is_flag=True, help='Bypass the confirmation prompt for large batches of files (more than 5).')
+@click.option('--png', is_flag=True, help='Additionally save the transparent images as standalone PNG files.')
+def process_batch(mode, force, png):
+    """Ultimate Bulk Icon Generator.
+    
+    Scans the current folder for ALL JPG, JPEG, and PNG images, removes solid 
+    black (1) or white (2) backgrounds smoothly, and outputs Windows .ico files.
     """
     valid_extensions = ('.jpg', '.jpeg', '.png')
     current_dir = os.getcwd()
     
-    # Analyze and count files (ignore existing .ico files and previously generated _transparent.png files)
+    # Scan for valid images, ignoring previously generated assets
     files = [f for f in os.listdir(current_dir) if f.lower().endswith(valid_extensions) and not f.lower().endswith('.ico') and not f.lower().endswith('_transparent.png')]
     
     if not files:
-        print("No matching JPG or PNG images found in this folder.")
+        click.secho("No matching JPG or PNG images found in this folder.", fg='yellow')
         return
 
-    print(f"Found {len(files)} images to process in: {current_dir}")
+    click.echo(f"Found {len(files)} images to process in: {current_dir}")
     
-    # Safety check
+    # Safety confirmation prompt managed elegantly
     CRITICAL_LIMIT = 5
-    if len(files) > CRITICAL_LIMIT and not force_flag:
-        print(f"\n[WARNING] You are about to process a large batch of images ({len(files)} files).")
-        response = input("Are you sure you want to proceed? (y/n): ").strip().lower()
-        if response != 'y':
-            print("Operation cancelled by user.")
+    if len(files) > CRITICAL_LIMIT and not force:
+        click.echo(f"\n[WARNING] You are about to process a large batch of images ({len(files)} files).")
+        if not click.confirm("Are you sure you want to proceed?"):
+            click.echo("Operation cancelled by user.")
             return
-        print("Proceeding with batch conversion...")
-    elif force_flag:
-        print("Force flag (-f) detected. Bypassing safety prompts...")
+        click.echo("Proceeding with batch conversion...")
+    elif force:
+        click.echo("Force flag (-f) detected. Bypassing safety prompts...")
 
-    print("\n--- Starting Conversion ---")
+    click.echo("\n--- Starting Conversion ---")
     success_count = 0
 
     for file_name in files:
@@ -112,7 +120,7 @@ def process_batch(mode, force_flag, save_png_flag):
         png_out_path = f"{file_name_without_ext}_transparent.png"
         
         try:
-            print(f"Processing '{file_name}'...")
+            click.echo(f"Processing '{file_name}'...")
             with Image.open(file_name) as img:
                 # 1. Remove background
                 transparent_img = remove_color_background(img, mode)
@@ -120,73 +128,19 @@ def process_batch(mode, force_flag, save_png_flag):
                 # 2. Save ICO (always done)
                 icon_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
                 transparent_img.save(ico_path, format="ICO", sizes=icon_sizes)
-                print(f"-> Saved successfully as: {ico_path}")
+                click.secho(f"  -> Saved successfully as: {ico_path}", fg='cyan')
                 
-                # 3. Save PNG (only if --png flag is active)
-                if save_png_flag:
+                # 3. Save PNG (only if --png option flag is active)
+                if png:
                     transparent_img.save(png_out_path, format="PNG")
-                    print(f"-> Saved successfully as: {png_out_path}")
+                    click.secho(f"  -> Saved successfully as: {png_out_path}", fg='cyan')
                     
                 success_count += 1
                 
         except Exception as e:
-            print(f"-> Failed to process '{file_name}': {e}")
+            click.secho(f"  -> Failed to process '{file_name}': {e}", fg='red', bold=True)
 
-    print(f"\nBatch processing finished! Successfully converted {success_count}/{len(files)} images.")
-
-def print_help_menu():
-    """Prints a beautiful and clear help menu to the console."""
-    print("==========================================================================")
-    print(" Batch Super ICO Converter - Help Menu")
-    print("==========================================================================")
-    print("This script processes all JPG, JPEG, and PNG images in the current folder.")
-    print("It applies a smooth 'Color to Alpha' background removal and packs them")
-    print("directly into multi-resolution Windows Icon (.ico) containers.\n")
-    print("Usage:")
-    print("  python batch_super_ico.py <mode> [options]\n")
-    print("Required Arguments:")
-    print("  <mode>    The background color to remove. Must be an integer:")
-    print("              1 = Process Black Backgrounds (Smooth Black to Alpha)")
-    print("              2 = Process White Backgrounds (Smooth White to Alpha)\n")
-    print("Optional Flags:")
-    print("  -f        Force mode. Bypasses the confirmation prompt when a folder")
-    print("            contains a large batch of images (more than 5 files).")
-    print("  --png     PNG Export. Additionally saves the transparent results as")
-    print("            individual PNG files ('<name>_transparent.png').")
-    print("  -h, --help Show this help menu and exit.\n")
-    print("Examples:")
-    print("  python batch_super_ico.py 1")
-    print("  python batch_super_ico.py 1 --png")
-    print("  python batch_super_ico.py 1 -f --png")
-    print("==========================================================================")
+    click.secho(f"\nBatch processing finished! Successfully converted {success_count}/{len(files)} images.", fg='green', bold=True)
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    
-    # Check for help flags first
-    if '-h' in args or '--help' in args or len(args) < 1:
-        print_help_menu()
-        sys.exit(0)
-    
-    # Check for other optional flags
-    force_active = '-f' in args
-    png_active = '--png' in args
-    
-    # Clean flags out of the args list to isolate the mode integer
-    if force_active:
-        args.remove('-f')
-    if png_active:
-        args.remove('--png')
-
-    try:
-        input_mode = int(args[0])
-        if input_mode == 1 or input_mode == 2:
-            if input_mode == 1:
-                print("Mode: BLACK to Alpha conversion selected.")
-            else:
-                print("Mode: WHITE to Alpha conversion selected.")
-            process_batch(input_mode, force_active, png_active)
-        else:
-            print("Error: Mode must be either 1 (Black) or 2 (White). Use --help for usage details.")
-    except (ValueError, IndexError):
-        print("Error: Invalid arguments. Use 'python batch_super_ico.py --help' to see correct usage.")
+    process_batch()
