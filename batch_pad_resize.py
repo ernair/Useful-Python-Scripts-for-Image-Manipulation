@@ -1,6 +1,6 @@
 """
-Smart Padded Resizer (Single & Bulk Aspect-Ratio Preserver)
-===========================================================
+Smart Padded Resizer (Single & Bulk Aspect-Ratio Preserver via Click)
+===================================================================
 This command-line utility resizes images into a perfect square dimension without 
 stretching or distorting the original content. It automatically scales the image 
 to fit the target boundary and fills the empty margins with transparent, solid black, 
@@ -11,14 +11,15 @@ Safety Feature:
     the target size to prevent massive unnecessary padding margins.
 
 Prerequisites:
-    pip install Pillow
+    pip install Pillow click
 
 Usage:
-    python batch_pad_resize.py <size> <input> [options]
+    python batch_pad_resize.py <size> <target_input> [options]
 """
 
 import os
 import sys
+import click
 from PIL import Image
 
 def pad_image_to_square(img, target_size, bg_mode):
@@ -39,39 +40,62 @@ def pad_image_to_square(img, target_size, bg_mode):
     background.paste(img.convert("RGBA"), offset, img.convert("RGBA"))
     return background
 
-def process_images(target_size, target_input, bg_mode, force_flag):
-    """Handles both single image processing and batch processing based on input."""
+# --- CLICK CLI CONFIGURATION ---
+
+@click.command()
+@click.argument('size', type=int)
+@click.argument('target_input')
+@click.option('-f', '--force', is_flag=True, help='Bypass the confirmation prompt for large batches (more than 5 files).')
+@click.option('--black', is_flag=True, help='Fill the empty margins with solid black padding.')
+@click.option('--white', is_flag=True, help='Fill the empty margins with solid white padding.')
+def process_images(size, target_input, force, black, white):
+    """Smart Padded Resizer.
+    
+    Resizes images into a perfect square size without stretching, padding 
+    the empty margins with transparent, black, or white canvas space instead.
+    
+    TARGET_INPUT can be a specific filename (e.g., photo.jpg) OR use 'all' 
+    to process ALL images in the current folder.
+    """
     valid_extensions = ('.jpg', '.jpeg', '.png')
     current_dir = os.getcwd()
     files_to_process = []
 
-    if target_input.lower() == '-a':
+    # Check for 'all' instead of '-a' to prevent CLI parameter confusion
+    if target_input.lower() == 'all':
         files_to_process = [f for f in os.listdir(current_dir) if f.lower().endswith(valid_extensions) and not f.lower().endswith('_padded.png')]
         if not files_to_process:
-            print("No matching JPG or PNG images found in this folder.")
+            click.secho("No matching JPG or PNG images found in this folder.", fg='yellow')
             return
-        print(f"Found {len(files_to_process)} images to batch process.")
+        click.echo(f"Found {len(files_to_process)} images to batch process.")
         
+        # Safety check for batch mode using Click's built-in confirmation
         CRITICAL_LIMIT = 5
-        if len(files_to_process) > CRITICAL_LIMIT and not force_flag:
-            print(f"\n[WARNING] You are about to resize a large batch of images ({len(files_to_process)} files).")
-            response = input("Are you sure you want to proceed? (y/n): ").strip().lower()
-            if response != 'y':
-                print("Operation cancelled by user.")
+        if len(files_to_process) > CRITICAL_LIMIT and not force:
+            click.secho(f"\n[WARNING] You are about to resize a large batch of images ({len(files_to_process)} files).", fg='yellow', bold=True)
+            if not click.confirm("Are you sure you want to proceed?"):
+                click.echo("Operation cancelled by user.")
                 return
-            print("Proceeding with batch conversion...")
-        elif force_flag:
-            print("Force flag (-f) detected. Bypassing safety prompts...")
+            click.echo("Proceeding with batch conversion...")
+        elif force:
+            click.echo("Force flag (-f/--force) detected. Bypassing safety prompts...")
     else:
         if not os.path.exists(target_input):
-            print(f"Error: The file '{target_input}' was not found.")
+            click.secho(f"Error: The file '{target_input}' was not found.", fg='red', bold=True)
             return
         if not target_input.lower().endswith(valid_extensions):
-            print("Error: Unsupported file format. Please use JPG or PNG.")
+            click.secho("Error: Unsupported file format. Please use JPG or PNG.", fg='red', bold=True)
             return
         files_to_process = [target_input]
 
-    print(f"\n--- Starting Padded Resizing (Target: {target_size}x{target_size}, Padding: {bg_mode.upper()}) ---")
+    # Determine background mode
+    bg_selection = "transparent"
+    if black:
+        bg_selection = "black"
+    elif white:
+        bg_selection = "white"
+
+    click.echo(f"\n--- Starting Padded Resizing (Target: {size}x{size}, Padding: {bg_selection.upper()}) ---")
     success_count = 0
     skipped_count = 0
 
@@ -81,76 +105,21 @@ def process_images(target_size, target_input, bg_mode, force_flag):
         
         try:
             with Image.open(file_name) as img:
-                # Check if both dimensions are already smaller than target_size
                 w, h = img.size
-                if w < target_size and h < target_size:
-                    print(f"-> Skipped '{file_name}': Image size ({w}x{h}) is fully smaller than target ({target_size}x{target_size}). Padding avoided.")
+                if w < size and h < size:
+                    click.secho(f"  -> Skipped '{file_name}': Size ({w}x{h}) is fully smaller than target ({size}x{size}). Padding avoided.", fg='yellow')
                     skipped_count += 1
                     continue
 
                 print(f"Processing '{file_name}' ({w}x{h})...")
-                final_img = pad_image_to_square(img, target_size, bg_mode)
+                final_img = pad_image_to_square(img, size, bg_selection)
                 final_img.save(output_path, format="PNG")
-                print(f"-> Saved successfully as: {output_path}")
+                click.secho(f"  -> Saved successfully as: {output_path}", fg='cyan')
                 success_count += 1
         except Exception as e:
-            print(f"-> Failed to process '{file_name}': {e}")
+            click.secho(f"  -> Failed to process '{file_name}': {e}", fg='red', bold=True)
 
-    print(f"\nFinished! Processed: {success_count} | Skipped (too small): {skipped_count} | Total files: {len(files_to_process)}")
-
-def print_help_menu():
-    """Prints a clear help menu to the console."""
-    print("==========================================================================")
-    print(" PNG/JPG Padded Resizer - Help Menu")
-    print("==========================================================================")
-    print("Resizes images into a perfect square size without stretching, adding")
-    print("transparent, black, or white padding to the margins instead.\n")
-    print("Note: This script automatically skips images whose dimensions are both")
-    print("      smaller than the target size to avoid massive empty margins.\n")
-    print("Usage:")
-    print("  python batch_pad_resize.py <size> <input> [options]\n")
-    print("Required Arguments:")
-    print("  <size>    The target square pixel dimension (e.g., 1024 for 1024x1024).")
-    print("  <input>   Specify a single filename (e.g., photo.jpg) OR use '-a' to")
-    print("            process ALL images in the current folder.\n")
-    print("Optional Flags:")
-    print("  -f        Force mode. Bypasses the confirmation prompt for >5 files.")
-    print("  --black   Fills the empty margins with solid black padding.")
-    print("  --white   Fills the empty margins with solid white padding.")
-    print("  -h, --help Show this help menu and exit.\n")
-    print("Examples:")
-    print("  python batch_pad_resize.py 1024 single_image.jpg")
-    print("  python batch_pad_resize.py 1024 -a --white")
-    print("==========================================================================")
+    click.secho(f"\nFinished! Processed: {success_count} | Skipped: {skipped_count} | Total files: {len(files_to_process)}", fg='green', bold=True)
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    
-    if '-h' in args or '--help' in args or len(args) < 2:
-        print_help_menu()
-        sys.exit(0)
-        
-    force_active = '-f' in args
-    black_active = '--black' in args
-    white_active = '--white' in args
-    
-    if force_active:
-        args.remove('-f')
-    if black_active:
-        args.remove('--black')
-    if white_active:
-        args.remove('--white')
-
-    bg_selection = "transparent"
-    if black_active:
-        bg_selection = "black"
-    elif white_active:
-        bg_selection = "white"
-
-    try:
-        # FIXED: Extract items from the list using indexing safely
-        input_size = int(args[0])
-        input_target = args[1]
-        process_images(input_size, input_target, bg_selection, force_active)
-    except (ValueError, IndexError):
-        print("Error: Invalid arguments. Use 'python batch_pad_resize.py --help' to see correct usage.")
+    process_images()

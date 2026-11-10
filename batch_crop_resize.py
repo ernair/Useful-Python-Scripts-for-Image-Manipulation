@@ -1,6 +1,6 @@
 """
-Smart Center-Crop Resizer (Single & Bulk Perfect Square Creator)
-===============================================================
+Smart Center-Crop Resizer (Single & Bulk Perfect Square Creator via Click)
+========================================================================
 This utility forces any JPG or PNG image into a perfect square dimension without 
 stretching. It scales the image to fully cover the target dimensions and automatically 
 crops out the excess margins from the exact center (Center Crop).
@@ -10,30 +10,15 @@ Safety Feature:
     to prevent low-quality upscaling blurry artifacts.
 
 Prerequisites:
-    pip install Pillow
+    pip install Pillow click
 
 Usage:
-    python batch_crop_resize.py <size> <input> [options]
-
-Required Arguments:
-    <size>    The target square pixel dimension (e.g., 1024 for 1024x1024).
-    <input>   Specify a single filename (e.g., photo.jpg) OR use '-a' to 
-              process ALL images in the current folder.
-
-Optional Flags:
-    -f        Force mode. Bypasses the warning prompt when processing 
-              more than 5 files in batch mode.
-    --jpg     Saves the output as a high-quality JPG instead of PNG.
-    -h, --help Show the built-in help menu and usage examples.
-
-Examples:
-    python batch_crop_resize.py 1024 single_image.jpg
-    python batch_crop_resize.py 1024 -a
-    python batch_crop_resize.py 1024 -a --jpg
+    python batch_crop_resize.py <size> <target_input> [options]
 """
 
 import os
 import sys
+import click
 from PIL import Image
 
 def crop_image_to_square(img, target_size, save_jpg=False):
@@ -68,43 +53,58 @@ def crop_image_to_square(img, target_size, save_jpg=False):
         
     return cropped_img
 
-def process_images(target_size, target_input, force_flag, save_jpg_flag):
-    """Handles both single image cropping and batch cropping based on input."""
+# --- CLICK CLI CONFIGURATION ---
+
+@click.command()
+@click.argument('size', type=int)
+@click.argument('target_input')
+@click.option('-f', '--force', is_flag=True, help='Bypass the safety confirmation prompt for large batches (more than 5 files).')
+@click.option('--jpg', is_flag=True, help='Save the output as a high-quality JPG instead of PNG (transparency turns white).')
+def process_images(size, target_input, force, jpg):
+    """Smart Center-Crop Resizer.
+    
+    Resizes images into a perfect square by scaling the shorter side and 
+    automatically cropping out overflowing edges from the center.
+    
+    TARGET_INPUT can be a specific filename (e.g., photo.jpg) OR use 'all' 
+    to process ALL images in the current folder.
+    """
     valid_extensions = ('.jpg', '.jpeg', '.png')
     current_dir = os.getcwd()
-    files_to_process = []
+    files_to_process = []  # FIXED: Empty list initialization here safely
 
-    out_ext = ".jpg" if save_jpg_flag else ".png"
+    out_ext = ".jpg" if jpg else ".png"
     out_suffix = "_cropped"
 
-    if target_input.lower() == '-a':
+    # Check for 'all' instead of '-a' to prevent CLI parameter confusion
+    if target_input.lower() == 'all':
         files_to_process = [f for f in os.listdir(current_dir) if f.lower().endswith(valid_extensions) and not f.lower().endswith(f'{out_suffix}.png') and not f.lower().endswith(f'{out_suffix}.jpg')]
         if not files_to_process:
-            print("No matching JPG or PNG images found in this folder.")
+            click.secho("No matching JPG or PNG images found in this folder.", fg='yellow')
             return
-        print(f"Found {len(files_to_process)} images to batch process.")
+        click.echo(f"Found {len(files_to_process)} images to batch process.")
         
+        # Safety check for batch mode using Click's built-in confirmation
         CRITICAL_LIMIT = 5
-        if len(files_to_process) > CRITICAL_LIMIT and not force_flag:
-            print(f"\n[WARNING] You are about to CROP a large batch of images ({len(files_to_process)} files).")
-            print("This will cut off edges from the sides or top/bottom to force a square shape.")
-            response = input("Are you sure you want to proceed? (y/n): ").strip().lower()
-            if response != 'y':
-                print("Operation cancelled by user.")
+        if len(files_to_process) > CRITICAL_LIMIT and not force:
+            click.secho(f"\n[WARNING] You are about to CROP a large batch of images ({len(files_to_process)} files).", fg='yellow', bold=True)
+            click.echo("This will cut off edges from the sides or top/bottom to force a square shape.")
+            if not click.confirm("Are you sure you want to proceed?"):
+                click.echo("Operation cancelled by user.")
                 return
-            print("Proceeding with batch cropping...")
-        elif force_flag:
-            print("Force flag (-f) detected. Bypassing safety prompts...")
+            click.echo("Proceeding with batch cropping...")
+        elif force:
+            click.echo("Force flag (-f/--force) detected. Bypassing safety prompts...")
     else:
         if not os.path.exists(target_input):
-            print(f"Error: The file '{target_input}' was not found.")
+            click.secho(f"Error: The file '{target_input}' was not found.", fg='red', bold=True)
             return
         if not target_input.lower().endswith(valid_extensions):
-            print("Error: Unsupported file format. Please use JPG or PNG.")
+            click.secho("Error: Unsupported file format. Please use JPG or PNG.", fg='red', bold=True)
             return
         files_to_process = [target_input]
 
-    print(f"\n--- Starting Center-Cropped Resizing (Target: {target_size}x{target_size}, Format: {out_ext.upper()[1:]}) ---")
+    click.echo(f"\n--- Starting Center-Cropped Resizing (Target: {size}x{size}, Format: {out_ext.upper()[1:]}) ---")
     success_count = 0
     skipped_count = 0
 
@@ -114,70 +114,26 @@ def process_images(target_size, target_input, force_flag, save_jpg_flag):
         
         try:
             with Image.open(file_name) as img:
-                # NEW UPGRADE: Check if image is smaller than the target size
                 w, h = img.size
-                if w < target_size or h < target_size:
-                    print(f"-> Skipped '{file_name}': Image size ({w}x{h}) is smaller than target ({target_size}x{target_size}). Upscaling prevented.")
+                if w < size or h < size:
+                    click.secho(f"  -> Skipped '{file_name}': Size ({w}x{h}) is smaller than target ({size}x{size}). Upscaling prevented.", fg='yellow')
                     skipped_count += 1
                     continue
 
-                print(f"Processing '{file_name}' ({w}x{h})...")
-                final_img = crop_image_to_square(img, target_size, save_jpg_flag)
+                click.echo(f"Processing '{file_name}' ({w}x{h})...")
+                final_img = crop_image_to_square(img, size, jpg)
                 
-                if save_jpg_flag:
+                if jpg:
                     final_img.save(output_path, format="JPEG", quality=95)
                 else:
                     final_img.save(output_path, format="PNG")
                     
-                print(f"-> Saved successfully as: {output_path}")
+                click.secho(f"  -> Saved successfully as: {output_path}", fg='cyan')
                 success_count += 1
         except Exception as e:
-            print(f"-> Failed to process '{file_name}': {e}")
+            click.secho(f"  -> Failed to process '{file_name}': {e}", fg='red', bold=True)
 
-    print(f"\nFinished! Processed: {success_count} | Skipped (too small): {skipped_count} | Total files: {len(files_to_process)}")
-
-def print_help_menu():
-    """Prints a clear help menu to the diabetes console."""
-    print("==========================================================================")
-    print(" PNG/JPG Center-Crop Resizer - Help Menu")
-    print("==========================================================================")
-    print("Resizes images into a perfect square by scaling the shorter side and")
-    print("automatically cropping out any overflowing edges from the exact center.\n")
-    print("Note: This script automatically skips images that are smaller than the")
-    print("      target size to prevent low-quality upscaling blurry artifacts.\n")
-    print("Usage:")
-    print("  python batch_crop_resize.py <size> <input> [options]\n")
-    print("Required Arguments:")
-    print("  <size>    The target square pixel dimension (e.g., 1024 for 1024x1024).")
-    print("  <input>   Specify a single filename (e.g., photo.jpg) OR use '-a' to")
-    print("            process ALL images in the current folder.\n")
-    print("Optional Flags:")
-    print("  -f        Force mode. Bypasses the confirmation prompt for >5 files.")
-    print("  --jpg     Saves the output as a high-quality JPG instead of PNG.")
-    print("  -h, --help Show this help menu and exit.\n")
-    print("Examples:")
-    print("  python batch_crop_resize.py 1024 single_image.jpg")
-    print("  python batch_crop_resize.py 1024 -a --jpg")
-    print("==========================================================================")
+    click.secho(f"\nFinished! Processed: {success_count} | Skipped: {skipped_count} | Total files: {len(files_to_process)}", fg='green', bold=True)
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    
-    if '-h' in args or '--help' in args or len(args) < 2:
-        print_help_menu()
-        sys.exit(0)
-        
-    force_active = '-f' in args
-    jpg_active = '--jpg' in args
-    
-    if force_active:
-        args.remove('-f')
-    if jpg_active:
-        args.remove('--jpg')
-
-    try:
-        input_size = int(args[0])
-        input_target = args[1]
-        process_images(input_size, input_target, force_active, jpg_active)
-    except (ValueError, IndexError):
-        print("Error: Invalid arguments. Use 'python batch_crop_resize.py --help' to see correct usage.")
+    process_images()
