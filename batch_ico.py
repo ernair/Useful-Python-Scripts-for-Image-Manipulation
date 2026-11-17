@@ -81,6 +81,9 @@ def generate_ico(target_input, bg, png, force):
     
     Packs images into a multi-resolution .ico container. Optionally removes solid 
     black or white backgrounds smoothly before packing.
+    
+    Supports all major raster formats: PNG, JPG, JPEG, WebP, BMP, TIFF, and GIF.
+    
     """
     valid_extensions = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif')
     current_dir = os.getcwd()
