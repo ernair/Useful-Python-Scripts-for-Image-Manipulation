@@ -2,9 +2,9 @@
 Batch & Single Color Filter (Monochrome Tint & Cyberpunk Duotone via Click)
 ===========================================================================
 Applies creative color grading to a single image or an entire directory.
-Loads custom color presets from an external 'colors.json' file and supports
-single-color monochrome tinting, special modes (grayscale, sepia, bitmap, 
-lineart), and two-tone Cyberpunk duotone mapping while preserving alpha.
+Loads and manages custom color presets in an external 'colors.json' file and 
+supports single-color monochrome tinting, special modes (grayscale, sepia, 
+bitmap, lineart), and two-tone Cyberpunk duotone mapping while preserving alpha.
 
 Supports all major raster formats: PNG, JPG, JPEG, WebP, BMP, TIFF, and GIF.
 
@@ -16,8 +16,8 @@ Usage:
 
 Examples:
     python batch_color_filter.py --list-colors
-    python batch_color_filter.py icon.png --tint inferno
-    python batch_color_filter.py photo.jpg --tint bitmap
+    python batch_color_filter.py --add-color lava "#FF3300"
+    python batch_color_filter.py icon.png --tint lava
     python batch_color_filter.py all --duotone deepviolet neon -i 85
 """
 
@@ -25,6 +25,11 @@ import os
 import json
 import click
 from PIL import Image, ImageOps, ImageColor
+
+def get_json_path():
+    """Returns the absolute path to 'colors.json' located next to the script."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, 'colors.json')
 
 def load_color_presets():
     """Loads custom color presets from 'colors.json' located next to the script."""
@@ -34,8 +39,7 @@ def load_color_presets():
         'matrix': '#00FF41',
         'inferno': '#A020F0'
     }
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(script_dir, 'colors.json')
+    json_path = get_json_path()
     
     if os.path.exists(json_path):
         try:
@@ -48,6 +52,30 @@ def load_color_presets():
             click.secho(f"[Warning] Could not read colors.json ({e}). Using built-in defaults.", fg='yellow')
             
     return default_presets
+
+def save_color_preset(name, color_val):
+    """Validates a color string, converts it to #RRGGBB hex, and saves it to colors.json."""
+    clean_name = name.strip().lower()
+    if not clean_name:
+        raise click.BadParameter("Color preset name cannot be empty.")
+        
+    try:
+        rgb = ImageColor.getrgb(color_val.strip())
+        # Convert to clean uppercase #RRGGBB format (ignoring alpha if 4-tuple)
+        r, g, b = rgb[:3]
+        hex_code = f"#{r:02X}{g:02X}{b:02X}"
+    except ValueError:
+        raise click.BadParameter(f"Invalid color value '{color_val}'. Use a valid hex code (e.g., #FF3300) or CSS color name.")
+
+    presets = load_color_presets()
+    existed = clean_name in presets
+    presets[clean_name] = hex_code
+    
+    json_path = get_json_path()
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(presets, f, indent=4)
+        
+    return clean_name, hex_code, existed
 
 def parse_color_safe(color_str, presets):
     """Converts a preset name, standard color name, or hex string into an RGB tuple."""
@@ -70,10 +98,8 @@ def apply_color_filter(img, tint, duotone, intensity, presets):
         if tint_lower == 'grayscale':
             filtered_rgb = gray.convert("RGB")
         elif tint_lower == 'bitmap':
-            # 1-bit black & white with Floyd-Steinberg dithering (classic newspaper/retro look)
             filtered_rgb = gray.convert("1").convert("RGB")
         elif tint_lower == 'lineart':
-            # Sharp 1-bit threshold without dithering (clean stencil/ink drawing look)
             filtered_rgb = gray.point(lambda p: 255 if p > 128 else 0, mode='1').convert("RGB")
         elif tint_lower == 'sepia':
             filtered_rgb = ImageOps.colorize(gray, black=(30, 18, 8), white=(245, 225, 195))
@@ -103,8 +129,9 @@ def apply_color_filter(img, tint, duotone, intensity, presets):
 @click.option('-d', '--duotone', nargs=2, default=None, help='Two colors for shadows and highlights (e.g., -d deepviolet neon).')
 @click.option('-i', '--intensity', type=click.IntRange(1, 100), default=100, show_default=True, help='Filter blend intensity percentage (1-100).')
 @click.option('--list-colors', is_flag=True, help='Display all available custom color presets from colors.json and exit.')
+@click.option('--add-color', nargs=2, default=None, help='Save a new color preset to colors.json (e.g., --add-color lava "#FF3300").')
 @click.option('-f', '--force', is_flag=True, help='Bypass the confirmation prompt for large batches (more than 5 files).')
-def filter_images(target_input, tint, duotone, intensity, list_colors, force):
+def filter_images(target_input, tint, duotone, intensity, list_colors, add_color, force):
     """Single & Bulk Color Filter (Tint & Duotone).
     
     Applies monochrome tinting, 1-bit B&W modes, or two-tone Cyberpunk duotone 
@@ -112,6 +139,18 @@ def filter_images(target_input, tint, duotone, intensity, list_colors, force):
     
     Supports all major raster formats: PNG, JPG, JPEG, WebP, BMP, TIFF, and GIF.
     """
+    if add_color:
+        name_arg, color_arg = add_color
+        try:
+            saved_name, saved_hex, existed = save_color_preset(name_arg, color_arg)
+            action = "Updated" if existed else "Added"
+            click.secho(f"Success! {action} preset '{saved_name}' -> {saved_hex} in colors.json.", fg='green', bold=True)
+        except click.BadParameter as bp:
+            click.secho(f"Error: {bp.format_message()}", fg='red', bold=True)
+        except Exception as e:
+            click.secho(f"Failed to save color preset: {e}", fg='red', bold=True)
+        return
+
     presets = load_color_presets()
 
     if list_colors:
@@ -124,7 +163,7 @@ def filter_images(target_input, tint, duotone, intensity, list_colors, force):
         return
 
     if not target_input:
-        click.secho("Error: Missing argument 'TARGET_INPUT'. Provide a filename, 'all', or use --list-colors.", fg='red', bold=True)
+        click.secho("Error: Missing argument 'TARGET_INPUT'. Provide a filename, 'all', --list-colors, or --add-color.", fg='red', bold=True)
         return
     if not tint and not duotone:
         click.secho("Error: You must specify either --tint (-t) or --duotone (-d).", fg='red', bold=True)

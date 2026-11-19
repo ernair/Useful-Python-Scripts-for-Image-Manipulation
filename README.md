@@ -6,7 +6,7 @@ All scripts utilize the **Click** library for clean CLI argument parsing, automa
 
 ## Features
 - **Modern CLI Architecture:** Built 100% on the `click` library for robust argument parsing, built-in `--help` menus, and native terminal coloring.
-- **Creative Color Grading & 1-Bit Modes:** Apply single-color tints, built-in special modes (`grayscale`, `sepia`, 1-bit dithered `bitmap`, and sharp `lineart`), and two-tone Cyberpunk duotones using an editable `colors.json` preset file.
+- **Creative Color Grading & 1-Bit Modes:** Apply single-color tints, built-in special modes (`grayscale`, `sepia`, 1-bit dithered `bitmap`, and sharp `lineart`), and two-tone Cyberpunk duotones using an editable `colors.json` preset bank with CLI color saving (`--add-color`).
 - **Customizable Image Watermarking:** Stamp proportional text (with custom colors and auto-shadows) or transparent logos onto single images or entire directories with margin and opacity controls.
 - **Universal Raster Format Converter:** Convert single images or whole directories between `PNG`, `JPG`, `WebP`, `BMP`, `TIFF`, and `GIF` with automatic transparency flattening onto black or white backgrounds.
 - **All-in-One ICO Pipeline:** Pack single images or entire folders into multi-resolution `.ico` containers with optional black/white background removal.
@@ -26,13 +26,14 @@ pip install Pillow click
 ## 🚀 Included Scripts
 
 ### 1. `batch_color_filter.py` (Single & Bulk Color Filter)
-Applies monochrome tinting, special modes (`grayscale`, `sepia`, `bitmap`, `lineart`), or two-tone Cyberpunk duotone color grading to a single image or an entire folder (`all`) while preserving alpha transparency. Reads custom color presets from `colors.json`.
+Applies monochrome tinting, special modes (`grayscale`, `sepia`, `bitmap`, `lineart`), or two-tone Cyberpunk duotone color grading to a single image or an entire folder (`all`) while preserving alpha transparency. Reads and updates custom color presets in `colors.json`.
 ```bash
-python batch_color_filter.py <target_input> [-t TINT | -d SHADOW HIGHLIGHT] [-i INTENSITY] [--list-colors] [-f]
+python batch_color_filter.py <target_input> [-t TINT | -d SHADOW HIGHLIGHT] [-i INTENSITY] [--list-colors] [--add-color NAME HEX] [-f]
 
 # Examples:
 python batch_color_filter.py --list-colors
-python batch_color_filter.py icon.png --tint inferno
+python batch_color_filter.py --add-color lava "#FF3300"
+python batch_color_filter.py icon.png --tint lava
 python batch_color_filter.py photo.jpg --tint bitmap
 python batch_color_filter.py all --duotone deepviolet neon -i 85
 ```
