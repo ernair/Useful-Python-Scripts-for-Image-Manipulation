@@ -1,11 +1,12 @@
 # Useful Python Scripts for Image Manipulation
 
-A collection of 12 modern, lightweight Python command-line tools designed to automate image background removal, transparent PNG/WebP exporting, raster format conversion, aspect-ratio squaring, WebP optimization, image compositing, watermarking, color grading, EXIF metadata stripping, grid collage creation, smart object trimming, and high-quality Windows Icon (`.ico`) generation. 
+A collection of 13 modern, lightweight Python command-line tools designed to automate image background removal, transparent PNG/WebP exporting, raster format conversion, aspect-ratio squaring, WebP optimization, image compositing, watermarking, color grading, EXIF metadata stripping, grid collage creation, smart object trimming, workflow pipeline automation, and high-quality Windows Icon (`.ico`) generation. 
 
 All scripts utilize the **Click** library for clean CLI argument parsing, automated input validation, and colorful terminal outputs. Background removal tools rely on a smart mathematical **Color to Alpha** algorithm (similar to GIMP and Photoshop) to smoothly convert solid black or white backgrounds into alpha transparency—perfect for neon graphics, sci-fi desktop themes, and logos without leaving jagged edges.
 
 ## Features
 - **Modern CLI Architecture:** Built 100% on the `click` library for robust argument parsing, built-in `--help` menus, and native terminal coloring.
+- **Reusable Workflow Pipelines (`pipelines.json`):** Chain multiple scripts together into saved, reusable command sequences (`--save`, `--delete`, `--list`), track output filenames automatically between steps, clean up temporary files, and tag final outputs (`--tag`).
 - **Smart Auto-Trim & Proportional Zoom:** Automatically detect object bounds on transparent, black, or white backgrounds (`--auto`), keep clean padding margins (`--padding`), or crop fixed edge percentages (`--percent`) and restore original dimensions (`--restore-size`) without aspect-ratio distortion.
 - **Grid Collage & Contact Sheet Generator:** Combine folders of images into uniform grids with custom columns, spacing, center-cropping, and transparent, solid color/hex, or custom image backgrounds.
 - **Privacy & EXIF Metadata Control:** Inspect hidden EXIF, GPS location, and software tags (`--inspect`) or strip all metadata cleanly while preserving physical image orientation.
@@ -149,9 +150,21 @@ Example:
 python batch_pad_resize.py 1024 all --white
 ```
 
+### 13. `batch_pipeline.py` (Workflow Pipeline & Command Chainer)
+Chains multiple image manipulation scripts together into reusable workflows stored in `pipelines.json`. Supports saving (`--save`), deleting (`--delete`), and listing (`--list`) workflows, tracking intermediate filenames automatically across steps, cleaning up temporary files, and custom output suffix tagging (`--tag`).
+```bash
+python batch_pipeline.py <pipeline_name> <target_input> [-t TAG] [--keep-temp] [-f]
+python batch_pipeline.py [--list | --save NAME STEP1 STEP2... | --delete NAME]
 
-📚 Additional Documentation & Config
+# Examples:
+python batch_pipeline.py --list
+python batch_pipeline.py --save ico_prosessi "batch_convert.py {file} png" "batch_trim.py {file} --auto -b black -p 1 -r" "batch_ico.py {file}"
+python batch_pipeline.py ico_prosessi image.jpg --tag auto
+python batch_pipeline.py ico_prosessi all --keep-temp
+```
 
-• colors.json: External JSON configuration file storing customizable hex color presets for batch_color_filter.py and batch_grid.py.
 
-• Digital_Image_File_Formats_Guide.pdf: A reference guide explaining the technical differences between major Raster (PNG, JPG, WebP, ICO, BMP, TIFF, GIF) and Vector (SVG, AI, EPS) image formats.
+## 📚 Additional Documentation & Config
+- **`pipelines.json`**: External JSON configuration file storing reusable multi-step image processing workflows for `batch_pipeline.py`.
+- **`colors.json`**: External JSON configuration file storing customizable hex color presets for `batch_color_filter.py` and `batch_grid.py`.
+- **`Digital_Image_File_Formats_Guide.pdf`**: A reference guide explaining the technical differences between major Raster (`PNG`, `JPG`, `WebP`, `ICO`, `BMP`, `TIFF`, `GIF`) and Vector (`SVG`, `AI`, `EPS`) image formats.

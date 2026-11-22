@@ -1,0 +1,18 @@
+{
+    "ico_prosessi": {
+        "description": "Convert to PNG, auto-trim black borders, and pack into Windows ICO",
+        "steps": [
+            "batch_convert.py {file} png",
+            "batch_trim.py {file} --auto -b black -p 1 -r",
+            "batch_ico.py {file}"
+        ]
+    },
+    "web_esikatselu": {
+        "description": "Rajaa, vesileimaa ja pakkaa WebP-muotoon",
+        "steps": [
+            "batch_trim.py {file} --auto -b black -p 5 -r",
+            "batch_watermark.py {file} --text 'Don InFerno'",
+            "batch_compress.py {file} -q 85"
+        ]
+    }
+}
