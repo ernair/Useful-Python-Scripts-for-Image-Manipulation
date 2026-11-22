@@ -1,11 +1,13 @@
 # Useful Python Scripts for Image Manipulation
 
-A collection of 13 modern, lightweight Python command-line tools designed to automate image background removal, transparent PNG/WebP exporting, raster format conversion, aspect-ratio squaring, WebP optimization, image compositing, watermarking, color grading, EXIF metadata stripping, grid collage creation, smart object trimming, workflow pipeline automation, and high-quality Windows Icon (`.ico`) generation. 
+A collection of 15 modern, lightweight Python command-line tools designed to automate image background removal, transparent PNG/WebP exporting, raster format conversion, aspect-ratio squaring, WebP optimization, image compositing, watermarking, color grading, EXIF metadata stripping, grid collage creation, smart object trimming, workflow pipeline automation, smart file renaming, image quality enhancement, and high-quality Windows Icon (`.ico`) generation. 
 
 All scripts utilize the **Click** library for clean CLI argument parsing, automated input validation, and colorful terminal outputs. Background removal tools rely on a smart mathematical **Color to Alpha** algorithm (similar to GIMP and Photoshop) to smoothly convert solid black or white backgrounds into alpha transparency—perfect for neon graphics, sci-fi desktop themes, and logos without leaving jagged edges.
 
 ## Features
 - **Modern CLI Architecture:** Built 100% on the `click` library for robust argument parsing, built-in `--help` menus, and native terminal coloring.
+- **Image Quality Enhancement:** Adjust sharpness, contrast, brightness, and color saturation (`batch_enhance.py`) across single images or full directories while preserving alpha transparency.
+- **Smart Bulk File Renaming:** Sanitize filenames (`--clean`), apply zero-padded sequential numbering (`--prefix`), or replace text strings (`--replace`) with safe two-pass renaming and `--dry-run` previewing.
 - **Reusable Workflow Pipelines (`pipelines.json`):** Chain multiple scripts together into saved, reusable command sequences (`--save`, `--delete`, `--list`), track output filenames automatically between steps, clean up temporary files, and tag final outputs (`--tag`).
 - **Smart Auto-Trim & Proportional Zoom:** Automatically detect object bounds on transparent, black, or white backgrounds (`--auto`), keep clean padding margins (`--padding`), or crop fixed edge percentages (`--percent`) and restore original dimensions (`--restore-size`) without aspect-ratio distortion.
 - **Grid Collage & Contact Sheet Generator:** Combine folders of images into uniform grids with custom columns, spacing, center-cropping, and transparent, solid color/hex, or custom image backgrounds.
@@ -161,6 +163,27 @@ python batch_pipeline.py --list
 python batch_pipeline.py --save ico_prosessi "batch_convert.py {file} png" "batch_trim.py {file} --auto -b black -p 1 -r" "batch_ico.py {file}"
 python batch_pipeline.py ico_prosessi image.jpg --tag auto
 python batch_pipeline.py ico_prosessi all --keep-temp
+```
+
+### 14. `batch_rename.py` (Smart Single & Bulk File Renamer)
+Safely renames single images or entire directories (`all`) using sequential numbering (`--prefix`), filename sanitization (`--clean`: lowercase, underscores, no special characters), or text replacement (`--replace`). Features a two-pass rename engine to prevent overwrites and a `--dry-run` preview mode.
+```bash
+python batch_rename.py <target_input> [-p PREFIX] [--start N] [--digits N] [--clean] [--replace OLD NEW] [--dry-run] [-f]
+
+# Examples:
+python batch_rename.py all --prefix cyber_icon --digits 3
+python batch_rename.py all --clean --dry-run
+python batch_rename.py all --replace "_trimmed" ""
+```
+
+### 15. `batch_enhance.py` (Image Sharpness, Contrast & Color Enhancer)
+Adjusts sharpness (`-s`), contrast (`-c`), brightness (`-b`), and color saturation (`--color`) for a single image or an entire folder (`all`) while preserving alpha transparency.
+```bash
+python batch_enhance.py <target_input> [-s SHARPNESS] [-c CONTRAST] [-b BRIGHTNESS] [--color SATURATION] [-f]
+
+# Examples:
+python batch_enhance.py icon.png --sharpness 1.4 --contrast 1.15
+python batch_enhance.py all -s 1.3 -c 1.1 --color 1.2
 ```
 
 
