@@ -1,11 +1,14 @@
 # Useful Python Scripts for Image Manipulation
 
-A collection of 15 modern, lightweight Python command-line tools designed to automate image background removal, transparent PNG/WebP exporting, raster format conversion, aspect-ratio squaring, WebP optimization, image compositing, watermarking, color grading, EXIF metadata stripping, grid collage creation, smart object trimming, workflow pipeline automation, smart file renaming, image quality enhancement, and high-quality Windows Icon (`.ico`) generation. 
+# Useful Python Scripts for Image Manipulation
+
+A collection of 16 modern, lightweight Python command-line tools designed to automate image background removal, transparent PNG/WebP exporting, raster format conversion, aspect-ratio squaring, WebP optimization, image compositing, watermarking, color grading, EXIF metadata stripping, grid collage creation, smart object trimming, workflow pipeline automation, smart file renaming, image quality enhancement, automated AI face blurring, and high-quality Windows Icon (`.ico`) generation. 
 
 All scripts utilize the **Click** library for clean CLI argument parsing, automated input validation, and colorful terminal outputs. Background removal tools rely on a smart mathematical **Color to Alpha** algorithm (similar to GIMP and Photoshop) to smoothly convert solid black or white backgrounds into alpha transparency—perfect for neon graphics, sci-fi desktop themes, and logos without leaving jagged edges.
 
 ## Features
 - **Modern CLI Architecture:** Built 100% on the `click` library for robust argument parsing, built-in `--help` menus, and native terminal coloring.
+- **Automated AI Face Blurring & Pixelation:** Detect human faces automatically via OpenCV's YuNet ONNX deep learning model (`batch_faceblur.py`) and obscure them with feathered oval masks (`--shape oval`), sharp rectangles (`--shape rect`), or mosaic pixelation (`--pixelate`).
 - **Image Quality Enhancement:** Adjust sharpness, contrast, brightness, and color saturation (`batch_enhance.py`) across single images or full directories while preserving alpha transparency.
 - **Smart Bulk File Renaming:** Sanitize filenames (`--clean`), apply zero-padded sequential numbering (`--prefix`), or replace text strings (`--replace`) with safe two-pass renaming and `--dry-run` previewing.
 - **Reusable Workflow Pipelines (`pipelines.json`):** Chain multiple scripts together into saved, reusable command sequences (`--save`, `--delete`, `--list`), track output filenames automatically between steps, clean up temporary files, and tag final outputs (`--tag`).
@@ -22,9 +25,9 @@ All scripts utilize the **Click** library for clean CLI argument parsing, automa
 - **Aspect-Ratio & Safety Protections:** Squaring scripts feature automated upscaling prevention to block blurry distortion, alongside batch volume confirmation prompts.
 
 ## Prerequisites
-The scripts require Python 3, **Pillow**, and the **Click** library. Install all dependencies via your terminal:
+Most scripts require Python 3, **Pillow**, and the **Click** library. For AI face detection (`batch_faceblur.py`), **OpenCV** and **NumPy** are also required. Install all dependencies via your terminal:
 ```bash
-pip install Pillow click
+pip install Pillow click opencv-python numpy
 ```
 
 ---
@@ -185,6 +188,23 @@ python batch_enhance.py <target_input> [-s SHARPNESS] [-c CONTRAST] [-b BRIGHTNE
 python batch_enhance.py icon.png --sharpness 1.4 --contrast 1.15
 python batch_enhance.py all -s 1.3 -c 1.1 --color 1.2
 ```
+
+### 16. `batch_faceblur.py` (Automated AI Face Blur & Pixelation Tool)
+Automatically detects human faces in single images or entire directories (`all`) using OpenCV's YuNet ONNX model and obscures them with adaptive Gaussian blur or mosaic pixelation (`--pixelate`). Supports smooth feathered oval masks (`--shape oval`) or rectangular boxes (`--shape rect`), adjustable detection confidence (`-c`), and skips images with 0 faces automatically.
+```bash
+python batch_faceblur.py <target_input> [--shape oval|rect] [-s STRENGTH] [--pixelate] [-c CONFIDENCE] [-f]
+
+# Examples:
+python batch_faceblur.py photo.jpg
+python batch_faceblur.py all --shape oval --strength 1.2
+python batch_faceblur.py group.png --pixelate --shape rect
+python batch_faceblur.py small_group.jpg -c 0.5
+```
+> **Note on the ONNX Model (`face_detection_yunet_2023mar.onnx`):**  
+> The script attempts to download the required YuNet neural network file (~227 KB) automatically on its first run. If your network, proxy, or firewall blocks the auto-download, open the official OpenCV Zoo model page in your browser:  
+> https://github.com/opencv/opencv_zoo/blob/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx  
+> Click **Download raw file** and place the downloaded `.onnx` file in the same folder as `batch_faceblur.py`.
+
 
 
 ## 📚 Additional Documentation & Config
